@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ultimate Rhythm Game</title>
+<style>
+    body { margin: 0; background: #111; color: white; font-family: Arial; text-align: center; overflow: hidden; }
+    canvas { display: block; margin: auto; background: #000; }
+    #menu { position: absolute; width: 100%; height: 100%; background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    button { font-size: 20px; padding: 10px 30px; margin: 10px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div id="menu">
+    <h1>🎵 Ultimate Rhythm Game 🎵</h1>
+    <p>Press A S D F to hit notes</p>
+    <button onclick="startGame()">Start Game</button>
+</div>
+
+<canvas id="game" width="500" height="700"></canvas>
+
+<script>
+// Canvas setup
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+// Game variables
+let notes = [];
+let score = 0;
+let combo = 0;
+let gameRunning = false;
+const lanes = ["A","S","D","F"];
+const laneX = [50, 150, 250, 350];
+const hitLine = 600;
+const noteSpeed = 3;
+
+// Audio setup
+let audioCtx, songSource, startTime;
+
+// Built-in song (simple beep melody)
+const songData = [ // seconds, lane
+  [0.5,0],[1,1],[1.5,2],[2,3],[2.5,0],[3,1],[3.5,2],[4,3],[4.5,0],[5,1]
+];
+
+function startGame(){
+    document.getElementById("menu").style.display="none";
+    gameRunning=true;
+    score=0; combo=0; notes=[];
+    
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    startTime = audioCtx.currentTime;
+    
+    requestAnimationFrame(gameLoop);
+}
+
+function update(){
+    const now = audioCtx.currentTime - startTime;
+    
+    // Spawn notes from songData
+    songData.forEach(([t,lane])=>{
+        if(!notes.find(n=>n.time===t) && now >= t-2){
+            notes.push({lane,y:-20,hit:false,time:t});
+        }
+    });
+    
+    notes.forEach(n=> n.y += noteSpeed);
+    notes = notes.filter(n=> n.y < canvas.height+50);
+}
+
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    
+    // Lanes
+    ctx.strokeStyle="#444";
+    for(let i=0;i<4;i++) ctx.strokeRect(laneX[i],0,80,canvas.height);
+    
+    // Hit line
+    ctx.strokeStyle="white";
+    ctx.beginPath();
+    ctx.moveTo(0,hitLine);
+    ctx.lineTo(canvas.width,hitLine);
+    ctx.stroke();
+    
+    // Notes
+    notes.forEach(n=>{
+        ctx.fillStyle = n.hit ? "green" : "cyan";
+        ctx.fillRect(laneX[n.lane]+10,n.y,60,20);
+    });
+    
+    // Score & combo
+    ctx.fillStyle="white";
+    ctx.fillText("Score: "+score,10,20);
+    ctx.fillText("Combo: "+combo,10,40);
+}
+
+function hit(lane){
+    for(let n of notes){
+        if(n.lane===lane && !n.hit && Math.abs(n.y-hitLine)<30){
+            n.hit=true;
+            score+=100;
+            combo++;
+            playBeep();
+            return;
+        }
+    }
+    combo=0;
+}
+
+function playBeep(){
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = 400;
+    gain.gain.value = 0.1;
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime+0.1);
+}
+
+document.addEventListener("keydown",e=>{
+    if(!gameRunning) return;
+    if(e.key==="a") hit(0);
+    if(e.key==="s") hit(1);
+    if(e.key==="d") hit(2);
+    if(e.key==="f") hit(3);
+});
+
+function gameLoop(){
+    if(!gameRunning) return;
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+</script>
+
+</body>
+</html>
